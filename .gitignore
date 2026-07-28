@@ -1,0 +1,6 @@
+scraping data
+__pycache__
+.env
+.venv
+runs_log.json
+.image_cache.json

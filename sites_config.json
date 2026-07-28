@@ -1,0 +1,27 @@
+{
+  "aggregate_page_id": 365850,
+  "wp_env_prefix": "RS",
+  "page_title": "Best Amazon Deals Today",
+  "enabled": true,
+  "schedule": {
+    "days_of_week": [
+      "sat"
+    ],
+    "hour": 5,
+    "minute": 0,
+    "timezone": "America/Chicago"
+  },
+  "last_run": "2026-07-28T19:13:28.864904",
+  "last_run_status": "success",
+  "sites": [
+    {
+      "id": "daveandsissy",
+      "name": "Dave & Sissy Daily Deals",
+      "scraper": "daveandsissy_scraper",
+      "source_url": "https://daveandsissydailydeals.com/amazon-deals",
+      "enabled": true,
+      "last_run": "2026-07-28T19:10:19.030244",
+      "last_run_status": "success"
+    }
+  ]
+}

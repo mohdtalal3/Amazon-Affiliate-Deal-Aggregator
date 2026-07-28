@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — Amazon Affiliate</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            color: #1a1a2e;
+            min-height: 100vh;
+        }
+        .header {
+            background: #fff;
+            padding: 16px 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #e63c3c;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+        .header h1 { color: #e63c3c; font-size: 22px; }
+        .header a {
+            color: #666;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .header a:hover { border-color: #e63c3c; color: #e63c3c; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+        .flash-container { margin-bottom: 20px; }
+        .flash { padding: 10px 16px; border-radius: 6px; margin-bottom: 8px; font-size: 14px; }
+        .flash.success { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+        .flash.error { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+        .flash.info { background: #e3f2fd; color: #1565c0; border: 1px solid #90caf9; }
+
+        .section-title {
+            font-size: 20px;
+            color: #1a1a2e;
+            margin-bottom: 16px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 8px;
+        }
+
+        /* Aggregate pipeline card */
+        .pipeline-card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 24px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 24px;
+        }
+        .pipeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        .pipeline-header h2 { font-size: 20px; color: #1a1a2e; }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-badge.active { background: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+        .status-badge.paused { background: #f5f5f5; color: #999; border: 1px solid #e0e0e0; }
+
+        .pipeline-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .info-item label { font-size: 12px; color: #888; display: block; margin-bottom: 2px; }
+        .info-item span { font-size: 14px; color: #333; }
+
+        .page-id-form { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+        .page-id-form input {
+            width: 120px;
+            background: #fff;
+            border: 1px solid #ddd;
+            color: #333;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        .page-id-form input:focus { outline: none; border-color: #e63c3c; }
+
+        /* Schedule */
+        .schedule-section {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid #e8e8e8;
+        }
+        .schedule-section h3 { font-size: 14px; color: #888; margin-bottom: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* Day checkboxes — pill style with visible name + checkbox icon */
+        .days-grid { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+        .day-check {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 8px 14px;
+            border: 1.5px solid #ddd;
+            border-radius: 8px;
+            background: #fff;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.15s;
+        }
+        .day-check:hover { border-color: #bbb; }
+        .day-check.selected {
+            border-color: #e63c3c;
+            background: #fff5f5;
+        }
+        .day-check-box {
+            width: 18px;
+            height: 18px;
+            border: 1.5px solid #ccc;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .day-check.selected .day-check-box {
+            background: #e63c3c;
+            border-color: #e63c3c;
+        }
+        .day-check.selected .day-check-box::after {
+            content: '✓';
+            font-size: 12px;
+            font-weight: 700;
+            color: #fff;
+            line-height: 1;
+        }
+        .day-label { font-size: 13px; font-weight: 600; color: #444; }
+        .day-check.selected .day-label { color: #e63c3c; }
+        .days-hint { font-size: 12px; color: #999; margin-bottom: 16px; }
+
+        /* Time picker — single bordered box mimicking a native time input */
+        .time-row { display: flex; gap: 16px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+        .time-picker-box {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border: 1.5px solid #ddd;
+            border-radius: 8px;
+            padding: 6px 12px;
+            background: #fff;
+        }
+        .time-picker-box:focus-within { border-color: #e63c3c; }
+        .time-picker-box select {
+            background: transparent;
+            border: none;
+            color: #333;
+            font-size: 14px;
+            cursor: pointer;
+            padding: 4px 2px;
+        }
+        .time-picker-box select:focus { outline: none; }
+        .time-picker-box .clock-icon { font-size: 14px; color: #999; margin-left: 4px; }
+        .time-separator { font-size: 14px; color: #999; font-weight: 700; }
+        .tz-picker { display: flex; align-items: center; gap: 8px; }
+        .tz-picker label { font-size: 13px; color: #666; }
+        .tz-picker select {
+            background: #fff;
+            border: 1.5px solid #ddd;
+            color: #333;
+            padding: 7px 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .tz-picker select:focus { outline: none; border-color: #e63c3c; }
+
+        .btn {
+            padding: 8px 18px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #e63c3c; color: #fff; }
+        .btn-primary:hover { background: #c33; }
+        .btn-secondary { background: #eee; color: #555; }
+        .btn-secondary:hover { background: #ddd; }
+        .btn-success { background: #2e7d32; color: #fff; }
+        .btn-success:hover { background: #1b5e20; }
+        .btn-warning { background: #ff9800; color: #fff; }
+        .btn-warning:hover { background: #f57c00; }
+        .btn-danger { background: #f44336; color: #fff; }
+        .btn-danger:hover { background: #d32f2f; }
+        .btn-sm { padding: 6px 14px; font-size: 12px; }
+        .btn-lg { padding: 12px 28px; font-size: 15px; }
+
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+        /* Scraper cards */
+        .scrapers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 16px;
+        }
+        .scraper-card {
+            background: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        }
+        .scraper-card.paused { opacity: 0.55; }
+        .scraper-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .scraper-header h3 { font-size: 16px; color: #1a1a2e; }
+        .scraper-info { margin-bottom: 10px; }
+        .scraper-info label { font-size: 11px; color: #999; }
+        .scraper-info span { font-size: 13px; color: #333; }
+        .scraper-info a { color: #1976d2; text-decoration: none; font-size: 12px; word-break: break-all; }
+
+        /* Runs log */
+        .runs-section { margin-top: 32px; }
+        .runs-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        }
+        .runs-table th {
+            background: #f5f5f5;
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 13px;
+            color: #666;
+            font-weight: 600;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .runs-table td {
+            padding: 10px 16px;
+            font-size: 13px;
+            border-top: 1px solid #eee;
+            color: #333;
+        }
+        .run-status { padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .run-status.success { background: #e8f5e9; color: #2e7d32; }
+        .run-status.failed { background: #ffebee; color: #c62828; }
+        .run-status.error { background: #ffebee; color: #c62828; }
+        .run-status.started { background: #e3f2fd; color: #1565c0; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: #fff;
+            border-radius: 12px;
+            padding: 28px;
+            max-width: 460px;
+            width: 90%;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+        }
+        .modal h3 { font-size: 18px; color: #1a1a2e; margin-bottom: 12px; }
+        .modal p { font-size: 14px; color: #555; line-height: 1.6; margin-bottom: 20px; }
+        .modal .warning-box {
+            background: #fff3e0;
+            border: 1px solid #ffcc80;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #e65100;
+        }
+        .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Amazon Affiliate Dashboard</h1>
+        <a href="/logout">Logout</a>
+    </div>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-container">
+                    {% for category, msg in messages %}
+                        <div class="flash {{ category }}">{{ msg }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Aggregate Pipeline -->
+        <h2 class="section-title">Aggregate Pipeline</h2>
+        <div class="pipeline-card">
+            <div class="pipeline-header">
+                <h2>{{ config.page_title | default("Best Amazon Deals") }}</h2>
+                <span class="status-badge {{ 'active' if config.enabled else 'paused' }}">
+                    {{ 'Active' if config.enabled else 'Paused' }}
+                </span>
+            </div>
+
+            <div class="pipeline-info">
+                <div class="info-item">
+                    <label>Aggregate Page ID</label>
+                    <span>{{ config.aggregate_page_id }}</span>
+                </div>
+                <div class="info-item">
+                    <label>Last Run</label>
+                    <span>{{ config.last_run[:19].replace('T', ' ') if config.last_run else 'Never' }}</span>
+                </div>
+                <div class="info-item">
+                    <label>Last Status</label>
+                    <span>{{ config.last_run_status or '—' }}</span>
+                </div>
+            </div>
+
+            <!-- Page ID editor -->
+            <div class="page-id-form">
+                <form method="POST" action="/page-id" style="display:flex;gap:8px;align-items:center;">
+                    <label style="font-size:13px;color:#888;">Page ID:</label>
+                    <input type="number" name="page_id" value="{{ config.aggregate_page_id }}">
+                    <button type="submit" class="btn btn-secondary btn-sm">Save</button>
+                </form>
+            </div>
+
+            <!-- Schedule -->
+            <div class="schedule-section">
+                <h3>Schedule (applies to all scrapers)</h3>
+                <form method="POST" action="/schedule" id="schedule-form">
+                    <!-- Day checkboxes with tick -->
+                    <div style="margin-bottom:8px;font-size:13px;font-weight:600;color:#444;">Repeat on Days</div>
+                    <div class="days-grid">
+                        {% for day in ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] %}
+                        <div class="day-check {{ 'selected' if day in config.schedule.days_of_week }}"
+                             onclick="toggleDay(this)"
+                             data-day="{{ day }}">
+                            <div class="day-check-box"></div>
+                            <span class="day-label">{{ days_map[day][:3] }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="days-hint">Uncheck days to skip them.</div>
+
+                    <!-- Time picker with AM/PM -->
+                    <div style="margin-bottom:8px;font-size:13px;font-weight:600;color:#444;">Post Time</div>
+                    <div class="time-row">
+                        <div class="time-picker-box">
+                            <select name="hour" id="hour-select">
+                                {% for h in range(1, 13) %}
+                                <option value="{{ h }}">{{ h }}</option>
+                                {% endfor %}
+                            </select>
+                            <span class="time-separator">:</span>
+                            <select name="minute">
+                                <option value="0">00</option>
+                                <option value="15">15</option>
+                                <option value="30">30</option>
+                                <option value="45">45</option>
+                            </select>
+                            <select name="ampm" id="ampm-select">
+                                <option value="AM">AM</option>
+                                <option value="PM">PM</option>
+                            </select>
+                            <span class="clock-icon">🕐</span>
+                        </div>
+                        <div class="tz-picker">
+                            <label>Timezone</label>
+                            <select name="timezone">
+                                {% for tz in ['America/Chicago', 'America/New_York', 'America/Los_Angeles', 'America/Denver', 'UTC', 'Asia/Karachi', 'Europe/London'] %}
+                                <option value="{{ tz }}" {{ 'selected' if tz == config.schedule.timezone }}>{{ tz }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div id="day-inputs"></div>
+                    <input type="hidden" name="hour_24" id="hour-24-input" value="{{ config.schedule.hour }}">
+                    <button type="submit" class="btn btn-primary btn-sm">Save Schedule</button>
+                </form>
+            </div>
+
+            <!-- Actions -->
+            <div class="actions">
+                <form method="POST" action="/run-all">
+                    <button type="submit" class="btn btn-success btn-lg">▶ Run All Scrapers & Publish</button>
+                </form>
+                <form method="POST" action="/toggle-pipeline">
+                    <button type="submit" class="btn {{ 'btn-warning' if config.enabled else 'btn-primary' }}">
+                        {{ 'Pause Pipeline' if config.enabled else 'Enable Pipeline' }}
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Individual Scrapers -->
+        <h2 class="section-title">Scrapers ({{ sites | length }})</h2>
+        <div class="scrapers-grid">
+            {% for site in sites %}
+            <div class="scraper-card {{ 'paused' if not site.enabled }}">
+                <div class="scraper-header">
+                    <h3>{{ site.name }}</h3>
+                    <span class="status-badge {{ 'active' if site.enabled else 'paused' }}">
+                        {{ 'Active' if site.enabled else 'Paused' }}
+                    </span>
+                </div>
+                <div class="scraper-info">
+                    <label>Source</label><br>
+                    <a href="{{ site.source_url }}" target="_blank">{{ site.source_url }}</a>
+                </div>
+                <div class="scraper-info">
+                    <label>Scraper Module:</label> <span>{{ site.scraper }}</span>
+                </div>
+                <div class="scraper-info">
+                    <label>Last Run:</label> <span>{{ site.last_run[:19].replace('T', ' ') if site.last_run else 'Never' }}</span>
+                    &nbsp;|&nbsp;
+                    <label>Status:</label> <span>{{ site.last_run_status or '—' }}</span>
+                </div>
+                <div class="actions">
+                    <button type="button"
+                            class="btn btn-primary btn-sm"
+                            onclick="confirmRunSingle('{{ site.id }}', '{{ site.name }}')">
+                        Run This Only
+                    </button>
+                    <form method="POST" action="/site/{{ site.id }}/toggle">
+                        <button type="submit" class="btn {{ 'btn-warning' if site.enabled else 'btn-secondary' }} btn-sm">
+                            {{ 'Pause' if site.enabled else 'Enable' }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Runs Log -->
+        <div class="runs-section">
+            <h2 class="section-title">Recent Runs</h2>
+            <table class="runs-table">
+                <thead>
+                    <tr>
+                        <th>Scope</th>
+                        <th>Time</th>
+                        <th>Status</th>
+                        <th>Message</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for run in runs|reverse %}
+                    <tr>
+                        <td>{{ run.site_id }}</td>
+                        <td>{{ run.timestamp[:19].replace('T', ' ') }}</td>
+                        <td><span class="run-status {{ run.status }}">{{ run.status }}</span></td>
+                        <td>{{ run.message }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal for Run Single Scraper -->
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal">
+            <h3>Run Single Scraper</h3>
+            <p>You are about to run only <strong id="modal-scraper-name"></strong>. This will scrape just that one site and publish its data to the aggregate page.</p>
+            <div class="warning-box">
+                ⚠️ <strong>Warning:</strong> Running a single scraper will overwrite the aggregate page with only this scraper's data. Other scrapers' data will be lost from the page until you run all scrapers again.
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <form method="POST" action="" id="modal-run-form">
+                    <button type="submit" class="btn btn-danger">Run Anyway</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ── Day toggle ──
+    function toggleDay(el) {
+        el.classList.toggle('selected');
+        updateDayInputs();
+    }
+
+    function updateDayInputs() {
+        const container = document.getElementById('day-inputs');
+        container.innerHTML = '';
+        document.querySelectorAll('#schedule-form .day-check.selected').forEach(chip => {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'days_of_week';
+            input.value = chip.dataset.day;
+            container.appendChild(input);
+        });
+    }
+
+    // ── AM/PM to 24-hour conversion ──
+    function updateHour24() {
+        const hour = parseInt(document.getElementById('hour-select').value);
+        const ampm = document.getElementById('ampm-select').value;
+        let hour24;
+        if (ampm === 'AM') {
+            hour24 = hour === 12 ? 0 : hour;
+        } else {
+            hour24 = hour === 12 ? 12 : hour + 12;
+        }
+        document.getElementById('hour-24-input').value = hour24;
+    }
+
+    document.getElementById('hour-select').addEventListener('change', updateHour24);
+    document.getElementById('ampm-select').addEventListener('change', updateHour24);
+
+    // ── Initialize from config ──
+    document.addEventListener('DOMContentLoaded', () => {
+        updateDayInputs();
+
+        // Convert stored 24h hour to 12h AM/PM
+        const storedHour = parseInt(document.getElementById('hour-24-input').value);
+        const hourSelect = document.getElementById('hour-select');
+        const ampmSelect = document.getElementById('ampm-select');
+
+        if (storedHour === 0) {
+            hourSelect.value = 12;
+            ampmSelect.value = 'AM';
+        } else if (storedHour < 12) {
+            hourSelect.value = storedHour;
+            ampmSelect.value = 'AM';
+        } else if (storedHour === 12) {
+            hourSelect.value = 12;
+            ampmSelect.value = 'PM';
+        } else {
+            hourSelect.value = storedHour - 12;
+            ampmSelect.value = 'PM';
+        }
+
+        // Set minute dropdown
+        const minuteSelect = document.querySelector('select[name="minute"]');
+        const storedMinute = {{ config.schedule.minute }};
+        for (const opt of minuteSelect.options) {
+            if (parseInt(opt.value) === storedMinute) {
+                opt.selected = true;
+                break;
+            }
+        }
+    });
+
+    // ── Modal for Run Single ──
+    function confirmRunSingle(siteId, siteName) {
+        document.getElementById('modal-scraper-name').textContent = siteName;
+        document.getElementById('modal-run-form').action = '/site/' + siteId + '/run';
+        document.getElementById('confirm-modal').classList.add('active');
+    }
+
+    function closeModal() {
+        document.getElementById('confirm-modal').classList.remove('active');
+    }
+
+    // Close modal on overlay click
+    document.getElementById('confirm-modal').addEventListener('click', function(e) {
+        if (e.target === this) closeModal();
+    });
+    </script>
+</body>
+</html>
