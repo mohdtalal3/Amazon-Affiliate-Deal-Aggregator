@@ -75,6 +75,7 @@ def render_carousel_card(item_index: int, product: dict) -> str:
     price = product.get("price", "")
     discount = product.get("discount", "").strip()
     amazon_url = product.get("amazon_url", "")
+    coupon_url = product.get("coupon_url")
     img_url = product.get("_img_url")
 
     title = name if name else f"Item #{item_index}"
@@ -96,7 +97,13 @@ def render_carousel_card(item_index: int, product: dict) -> str:
         if title:
             discount_lines = [line for line in discount_lines if title.lower() not in line.lower()]
         for line in discount_lines:
-            html += f'<div class="carousel-card-discount">{line}</div>'
+            if coupon_url and "coupon" in line.lower():
+                html += (
+                    f'<a href="{coupon_url}" target="_blank" rel="noopener noreferrer" '
+                    f'class="carousel-card-discount carousel-card-coupon-link">{line}</a>'
+                )
+            else:
+                html += f'<div class="carousel-card-discount">{line}</div>'
 
     if amazon_url:
         html += (
@@ -157,11 +164,11 @@ CAROUSEL_STYLE_AND_SCRIPT = """
 .deals-carousel-page .carousel-card-img img { max-height: 150px; max-width: 100%; object-fit: contain; }
 .deals-carousel-page .carousel-card-title {
     font-size: 13.5px; font-weight: 600; color: #222; margin-bottom: 6px;
-    min-height: 34px; display: -webkit-box; -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical; overflow: hidden;
 }
 .deals-carousel-page .carousel-card-price { font-size: 15px; font-weight: 700; color: #2e7d32; margin-bottom: 4px; }
 .deals-carousel-page .carousel-card-discount { font-size: 11.5px; color: #e63c3c; font-weight: 600; }
+.deals-carousel-page .carousel-card-coupon-link { display: block; text-decoration: underline; cursor: pointer; }
+.deals-carousel-page .carousel-card-coupon-link:hover { color: #b91c1c; }
 .deals-carousel-page .carousel-card-btn {
     display: block; text-align: center; margin-top: 10px; background: #e63c3c;
     color: #fff; text-decoration: none; font-weight: bold; padding: 9px 12px;

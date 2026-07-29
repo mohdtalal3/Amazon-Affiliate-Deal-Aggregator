@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+"""Scrape Amazon deals from jungle.deals (Jungle Deals Blog) via its internal JSON API and save to JSON."""
+
+import json
+import re
+import shutil
+from pathlib import Path
+from urllib.parse import urlparse
+
+import requests
+
+API_URL = "https://www.jungle.deals/api/get-page/best-selling-deals"
+PAGE_URL = "https://www.jungle.deals/p/best-selling-deals"
+DATA_DIR = Path(__file__).resolve().parent / "scraping data" / "jungledeals_data"
+OUTPUT_FILE = DATA_DIR / "jungledeals_deals.json"
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "x-origin": "frontend",
+    "referer": PAGE_URL,
+}
+
+
+def amazon_url_from_asin(asin: str) -> str | None:
+    if not asin:
+        return None
+    return f"https://www.amazon.com/dp/{asin.upper()}"
+
+
+def coupon_url_from_promo_code(promo_code: str) -> str | None:
+    """Build the 'clip coupon' redirect link from the promoCode field."""
+    if not promo_code:
+        return None
+    return (
+        f"https://www.amazon.com/promotion/psp/{promo_code}"
+        f"?ref=clp_external&redirectMerchantId=ATVPDKIKX0DER&tag=jd-best-sell-20"
+    )
+
+
+def format_price(deal: dict) -> str:
+    """e.g. '$14.38 (reg. $14.38)' or '$25.40 (reg. $27.99)'."""
+    current = deal.get("currentPrice")
+    list_price = deal.get("listPrice")
+    if current is None:
+        return ""
+    price = f"${current:g}"
+    if list_price is not None and list_price != current:
+        price += f" (reg. ${list_price:g})"
+    return price
+
+
+def format_discount(deal: dict) -> str:
+    """Build discount/promo lines similar to the site's on-page text."""
+    lines = []
+
+    coupon_pct = deal.get("couponPercentage")
+    if coupon_pct:
+        lines.append(f"Click to instantly clip the {coupon_pct}% off coupon")
+
+    max_ss = deal.get("maxSs")
+    if deal.get("ss") and max_ss:
+        lines.append(f"Subscribe & Save to get up to an extra {max_ss}% off")
+
+    final_price = deal.get("finalPrice")
+    if final_price is not None:
+        lines.append(f"Final price as low as ${final_price:g} shipped!")
+
+    extra_deal = deal.get("extraDeal")
+    if extra_deal:
+        lines.append(f"Also eligible for promotion: {extra_deal}")
+
+    return "\n".join(lines)
+
+
+def scrape_products(payload: dict) -> list[dict]:
+    deals = payload.get("deals", [])
+    products = []
+
+    for deal in deals:
+        asin = deal.get("ASIN")
+        amazon_url = amazon_url_from_asin(asin)
+        if not amazon_url:
+            continue
+
+        name = (deal.get("title") or "").strip()
+        image_url = (
+            deal.get("highResImage")
+            or deal.get("image600Url")
+            or deal.get("image")
+            or ""
+        ).strip()
+
+        products.append(
+            {
+                "name": name,
+                "description": "",
+                "amazon_url": amazon_url,
+                "image_url": image_url,
+                "discount": format_discount(deal),
+                "price": format_price(deal),
+                "coupon_url": coupon_url_from_promo_code(deal.get("promoCode")),
+            }
+        )
+
+    return products
+
+
+def sanitize_filename(name: str) -> str:
+    """Make a safe filename from a product name."""
+    safe = re.sub(r'[<>:"/\\|?*\n\r\t]', '_', name).strip().strip('.')
+    return safe or "unnamed"
+
+
+def download_images(products: list[dict], dest_dir: Path) -> None:
+    """Download each product image, named by product name.
+    Sets 'image_path' (full local path) on each product dict."""
+    for i, product in enumerate(products, start=1):
+        img_url = product.get("image_url", "")
+        if not img_url:
+            print(f"  [{i}] No image URL — skipping download")
+            continue
+
+        name = sanitize_filename(product.get("name", f"product_{i}"))
+        ext = Path(urlparse(img_url).path).suffix or ".jpg"
+        if ext.lower() not in (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"):
+            ext = ".jpg"
+
+        img_path = dest_dir / f"{name}{ext}"
+
+        counter = 1
+        while img_path.exists():
+            img_path = dest_dir / f"{name}_{counter}{ext}"
+            counter += 1
+
+        try:
+            resp = requests.get(img_url, headers=HEADERS, timeout=30)
+            resp.raise_for_status()
+            img_path.write_bytes(resp.content)
+            product["image_path"] = str(img_path.resolve())
+            print(f"  [{i}] Downloaded: {img_path.name}")
+        except Exception as e:
+            print(f"  [{i}] Failed to download {img_url}: {e}")
+
+
+def main() -> None:
+    print(f"Fetching {API_URL} ...")
+    resp = requests.get(API_URL, headers=HEADERS, timeout=30)
+    resp.raise_for_status()
+    payload = resp.json()
+
+    products = scrape_products(payload)
+    print(f"Found {len(products)} products")
+
+    # Testing limit — remove or increase for production
+    products = products[:10]
+    print(f"Limited to {len(products)} products for testing")
+
+    if DATA_DIR.exists():
+        shutil.rmtree(DATA_DIR)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    print(f"\nDownloading images to {DATA_DIR} ...")
+    download_images(products, DATA_DIR)
+
+    with OUTPUT_FILE.open("w", encoding="utf-8") as f:
+        json.dump(products, f, indent=2, ensure_ascii=False)
+    print(f"Saved JSON to {OUTPUT_FILE}")
+
+    print(f"\nDone — all data in {DATA_DIR}")
+
+
+if __name__ == "__main__":
+    main()

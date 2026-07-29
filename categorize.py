@@ -100,7 +100,7 @@ def categorize_products(products: list[dict], site_name: str = "") -> list[dict]
             model="grok-4.5",
             max_output_tokens=500000,
             reasoning={
-                "effort": "medium"
+                "effort": "low"
             },
             store=False,
             text={
@@ -117,7 +117,8 @@ def categorize_products(products: list[dict], site_name: str = "") -> list[dict]
                     "content": (
                         "You are a product categorization assistant. You always return "
                         "valid JSON matching the given schema — one group per category, "
-                        "each group listing all of its product indexes together."
+                        "each group listing all of its product indexes together. "
+                        "Do not explain your reasoning or add any commentary — output only the JSON."
                     ),
                 },
                 {"role": "user", "content": _build_prompt(names)},
@@ -136,7 +137,6 @@ def categorize_products(products: list[dict], site_name: str = "") -> list[dict]
 
         data = json.loads(response_text)
         result = CategorizedGroupList(**data)
-        print(result)
         valid_categories = set(CATEGORIES)
         for group in result.groups:
             category = group.category if group.category in valid_categories else "Other"
