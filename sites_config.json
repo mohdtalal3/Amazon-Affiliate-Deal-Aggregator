@@ -11,7 +11,7 @@
     "minute": 0,
     "timezone": "America/Chicago"
   },
-  "last_run": "2026-07-29T23:46:25.618037",
+  "last_run": "2026-07-31T00:32:49.396195",
   "last_run_status": "success",
   "sites": [
     {
@@ -19,7 +19,7 @@
       "name": "Dave & Sissy Daily Deals",
       "scraper": "daveandsissy_scraper",
       "source_url": "https://daveandsissydailydeals.com/amazon-deals",
-      "enabled": true,
+      "enabled": false,
       "last_run": "2026-07-29T23:43:48.098507",
       "last_run_status": "success"
     },
@@ -29,7 +29,7 @@
       "scraper": "jungledeals_scraper",
       "source_url": "https://www.jungle.deals/p/best-selling-deals",
       "enabled": true,
-      "last_run": "2026-07-29T23:45:09.805084",
+      "last_run": "2026-07-31T00:32:37.973262",
       "last_run_status": "success"
     }
   ]

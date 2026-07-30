@@ -32,16 +32,6 @@ def amazon_url_from_asin(asin: str) -> str | None:
     return f"https://www.amazon.com/dp/{asin.upper()}"
 
 
-def coupon_url_from_promo_code(promo_code: str) -> str | None:
-    """Build the 'clip coupon' redirect link from the promoCode field."""
-    if not promo_code:
-        return None
-    return (
-        f"https://www.amazon.com/promotion/psp/{promo_code}"
-        f"?ref=clp_external&redirectMerchantId=ATVPDKIKX0DER&tag=jd-best-sell-20"
-    )
-
-
 def format_price(deal: dict) -> str:
     """e.g. '$14.38 (reg. $14.38)' or '$25.40 (reg. $27.99)'."""
     current = deal.get("currentPrice")
@@ -58,13 +48,13 @@ def format_discount(deal: dict) -> str:
     """Build discount/promo lines similar to the site's on-page text."""
     lines = []
 
-    coupon_pct = deal.get("couponPercentage")
-    if coupon_pct:
-        lines.append(f"Click to instantly clip the {coupon_pct}% off coupon")
+    # coupon_pct = deal.get("couponPercentage")
+    # if coupon_pct:
+    #     lines.append(f"Click to instantly clip the {coupon_pct}% off coupon")
 
-    max_ss = deal.get("maxSs")
-    if deal.get("ss") and max_ss:
-        lines.append(f"Subscribe & Save to get up to an extra {max_ss}% off")
+    # max_ss = deal.get("maxSs")
+    # if deal.get("ss") and max_ss:
+    #     lines.append(f"Subscribe & Save to get up to an extra {max_ss}% off")
 
     final_price = deal.get("finalPrice")
     if final_price is not None:
@@ -82,6 +72,9 @@ def scrape_products(payload: dict) -> list[dict]:
     products = []
 
     for deal in deals:
+        if deal.get("promoCode"):
+            continue
+
         asin = deal.get("ASIN")
         amazon_url = amazon_url_from_asin(asin)
         if not amazon_url:
@@ -103,7 +96,6 @@ def scrape_products(payload: dict) -> list[dict]:
                 "image_url": image_url,
                 "discount": format_discount(deal),
                 "price": format_price(deal),
-                "coupon_url": coupon_url_from_promo_code(deal.get("promoCode")),
             }
         )
 
@@ -157,7 +149,7 @@ def main() -> None:
     print(f"Found {len(products)} products")
 
     # Testing limit — remove or increase for production
-    products = products[:10]
+    products = products[:2]
     print(f"Limited to {len(products)} products for testing")
 
     if DATA_DIR.exists():

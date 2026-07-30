@@ -96,6 +96,10 @@ def scrape_products(html: str) -> list[dict]:
         details = card.select_one("div.details")
         discount, price = parse_details(details)
 
+        # Skip coupon products — detected by "Code" in the discount/details text
+        if discount and re.search(r"\bCode\b", discount, re.I):
+            continue
+
         products.append(
             {
                 "name": name,
