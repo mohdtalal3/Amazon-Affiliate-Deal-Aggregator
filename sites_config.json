@@ -28,9 +28,16 @@
       "name": "Jungle Deals Blog",
       "scraper": "jungledeals_scraper",
       "source_url": "https://www.jungle.deals/p/best-selling-deals",
-      "enabled": true,
+      "enabled": false,
       "last_run": "2026-07-31T00:32:37.973262",
       "last_run_status": "success"
+    },
+    {
+      "id": "taylorsdailydeals",
+      "name": "Taylor's Daily Deals",
+      "scraper": "taylorsdailydeals_scraper",
+      "source_url": "https://www.taylorsdailydeals.com/deals",
+      "enabled": true
     }
   ]
 }
