@@ -38,6 +38,13 @@
       "scraper": "taylorsdailydeals_scraper",
       "source_url": "https://www.taylorsdailydeals.com/deals",
       "enabled": true
+    },
+    {
+      "id": "slickdeals",
+      "name": "Slickdeals Amazon",
+      "scraper": "slickdeals_scraper",
+      "source_url": "https://slickdeals.net/browse/top-retail-deals/",
+      "enabled": true
     }
   ]
 }
