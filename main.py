@@ -69,6 +69,17 @@ def slugify(text: str) -> str:
     return slug or "other"
 
 
+def _parse_prices(price: str) -> tuple[float | None, float | None]:
+    """Parse a price string like '$27.99 (reg. $54.99)' into (deal_price, reg_price)."""
+    if not price:
+        return None, None
+    deal_match = re.search(r"\$\s*([\d,]+(?:\.\d+)?)", price)
+    reg_match = re.search(r"reg\.?\s*\$\s*([\d,]+(?:\.\d+)?)", price, re.I)
+    deal_price = float(deal_match.group(1).replace(",", "")) if deal_match else None
+    reg_price = float(reg_match.group(1).replace(",", "")) if reg_match else None
+    return deal_price, reg_price
+
+
 def render_carousel_card(item_index: int, product: dict) -> str:
     """Render a single product as a compact carousel card."""
     name = product.get("name", "").strip()
@@ -81,15 +92,34 @@ def render_carousel_card(item_index: int, product: dict) -> str:
     title = title[0].upper() + title[1:] if title else title
     title_safe = title.replace('"', '&quot;')
 
+    deal_price, reg_price = _parse_prices(price)
+    discount_pct = None
+    savings = None
+    if deal_price is not None and reg_price is not None and reg_price > deal_price > 0:
+        discount_pct = round((reg_price - deal_price) / reg_price * 100)
+        savings = reg_price - deal_price
+
     html = '<div class="carousel-card">'
 
     if img_url:
-        html += f'<div class="carousel-card-img"><img src="{img_url}" alt="{title_safe}" loading="lazy" /></div>'
+        html += f'<div class="carousel-card-img"><img src="{img_url}" alt="{title_safe}" loading="lazy" />'
+        if discount_pct:
+            html += f'<span class="carousel-card-badge">-{discount_pct}% OFF</span>'
+        html += '</div>'
 
     html += f'<div class="carousel-card-title">{title}</div>'
 
-    if price:
+    if deal_price is not None:
+        html += '<div class="carousel-card-price-row">'
+        html += f'<span class="carousel-card-price">${deal_price:,.2f}</span>'
+        if reg_price is not None and reg_price > deal_price:
+            html += f'<span class="carousel-card-price-reg">${reg_price:,.2f}</span>'
+        html += '</div>'
+    elif price:
         html += f'<div class="carousel-card-price">{price}</div>'
+
+    if savings is not None and discount_pct is not None:
+        html += f'<div class="carousel-card-save">Save ${savings:,.2f} ({discount_pct}%)</div>'
 
     if discount:
         discount_lines = [line.strip() for line in discount.split("\n") if line.strip()]
@@ -100,9 +130,10 @@ def render_carousel_card(item_index: int, product: dict) -> str:
             html += f'<div class="carousel-card-discount">{line}</div>'
 
     if amazon_url:
+        html += '<div class="carousel-card-spacer"></div>'
         html += (
             f'<a href="{amazon_url}" target="_blank" rel="noopener noreferrer" '
-            f'class="carousel-card-btn">See Deal on Amazon →</a>'
+            f'class="carousel-card-btn">See Deal on Amazon &amp; Claim Offer →</a>'
         )
 
     html += '</div>'
@@ -153,19 +184,33 @@ CAROUSEL_STYLE_AND_SCRIPT = """
 }
 .deals-carousel-page .carousel-card-img {
     height: 150px; display: flex; align-items: center; justify-content: center;
-    margin-bottom: 10px;
+    margin-bottom: 10px; position: relative;
 }
 .deals-carousel-page .carousel-card-img img { max-height: 150px; max-width: 100%; object-fit: contain; }
+.deals-carousel-page .carousel-card-badge {
+    position: absolute; top: 0; right: 0;
+    background: linear-gradient(135deg, #f44336, #e91e63);
+    color: #fff; font-size: 12px; font-weight: 800;
+    padding: 4px 10px; border-radius: 20px; line-height: 1.3;
+    text-align: center; box-shadow: 0 2px 6px rgba(230,60,60,0.4);
+}
 .deals-carousel-page .carousel-card-title {
-    font-size: 13.5px; font-weight: 700; color: #222; margin-bottom: 6px;
+    font-size: 14px; font-weight: 800; color: #111; margin-bottom: 6px;
 }
-.deals-carousel-page .carousel-card-price { font-size: 15px; font-weight: 700; color: #2e7d32; margin-bottom: 4px; }
+.deals-carousel-page .carousel-card-price-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
+.deals-carousel-page .carousel-card-price { font-size: 17px; font-weight: 800; color: #2e7d32; margin-bottom: 4px; }
+.deals-carousel-page .carousel-card-price-reg { font-size: 13px; color: #999; text-decoration: line-through; }
+.deals-carousel-page .carousel-card-save { font-size: 12px; color: #555; margin-bottom: 4px; }
 .deals-carousel-page .carousel-card-discount { font-size: 11.5px; color: #e63c3c; font-weight: 600; }
+.deals-carousel-page .carousel-card-spacer { flex: 1 0 14px; }
 .deals-carousel-page .carousel-card-btn {
-    display: block; text-align: center; margin-top: 10px; background: #e63c3c;
-    color: #fff; text-decoration: none; font-weight: bold; padding: 9px 12px;
-    border-radius: 6px; font-size: 13px;
+    display: block; text-align: center;
+    background: linear-gradient(90deg, #f44336, #ff7043);
+    color: #fff; text-decoration: none; font-weight: 800; padding: 11px 12px;
+    border-radius: 25px; font-size: 13.5px; letter-spacing: 0.2px;
+    box-shadow: 0 3px 8px rgba(244,67,54,0.35); transition: transform 0.15s;
 }
+.deals-carousel-page .carousel-card-btn:hover { transform: translateY(-1px); }
 </style>
 <script>
 (function() {

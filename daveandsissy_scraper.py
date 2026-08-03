@@ -162,7 +162,7 @@ def main() -> None:
     print(f"Found {len(products)} products")
 
     # Testing limit — remove or increase for production
-    products = products[:10]
+    products = products[:2]
     print(f"Limited to {len(products)} products for testing")
 
     # Recreate data directory (replace existing)
