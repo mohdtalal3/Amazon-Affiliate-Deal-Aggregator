@@ -254,8 +254,7 @@ def download_images(products: list[dict], dest_dir: Path) -> None:
             counter += 1
 
         try:
-            resp = requests.get(img_url, headers={"User-Agent": HEADERS["User-Agent"]}, timeout=30, impersonate="chrome", proxy=PROXY or None)
-            resp.raise_for_status()
+            resp = _fetch_with_retry(img_url, headers={"User-Agent": HEADERS["User-Agent"]}, timeout=30, impersonate="chrome", proxy=None)
             img_path.write_bytes(resp.content)
             product["image_path"] = str(img_path.resolve())
             print(f"  [{i}] Downloaded: {img_path.name}")

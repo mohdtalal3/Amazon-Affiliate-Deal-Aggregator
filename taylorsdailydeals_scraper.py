@@ -2,12 +2,20 @@
 """Scrape Amazon deals from taylorsdailydeals.com via its internal JSON API and save to JSON."""
 
 import json
+import os
 import re
 import shutil
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
+PROXY = os.environ.get("STATIC_PROXY", "")
+_PROXIES = {"http": PROXY, "https": PROXY} if PROXY else None
 
 API_URL = "https://www.taylorsdailydeals.com/api/deals"
 PAGE_URL = "https://www.taylorsdailydeals.com/deals"
@@ -25,6 +33,25 @@ HEADERS = {
 }
 
 PAGE_SIZE = 50
+MAX_RETRIES = 3
+
+
+def _fetch_with_retry(url: str, use_proxy: bool = True, **kwargs) -> requests.Response:
+    """GET request with up to MAX_RETRIES attempts and progressive backoff."""
+    if use_proxy and _PROXIES and "proxies" not in kwargs:
+        kwargs["proxies"] = _PROXIES
+    last_exc = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            resp = requests.get(url, **kwargs)
+            resp.raise_for_status()
+            return resp
+        except Exception as e:
+            last_exc = e
+            if attempt < MAX_RETRIES:
+                print(f"    Retry {attempt}/{MAX_RETRIES} for {url[:70]}... ({e})")
+                time.sleep(1 * attempt)
+    raise last_exc
 
 
 def clean_product_name(title: str) -> str:
@@ -49,13 +76,12 @@ def fetch_all_deals() -> list[dict]:
     all_items = []
     offset = 0
     while True:
-        resp = requests.get(
+        resp = _fetch_with_retry(
             API_URL,
             params={"limit": PAGE_SIZE, "offset": offset},
             headers=HEADERS,
             timeout=30,
         )
-        resp.raise_for_status()
         data = resp.json()
         items = data.get("items", [])
         all_items.extend(items)
@@ -129,8 +155,7 @@ def download_images(products: list[dict], dest_dir: Path) -> None:
             counter += 1
 
         try:
-            resp = requests.get(img_url, headers=HEADERS, timeout=30)
-            resp.raise_for_status()
+            resp = _fetch_with_retry(img_url, use_proxy=False, headers=HEADERS, timeout=30)
             img_path.write_bytes(resp.content)
             product["image_path"] = str(img_path.resolve())
             print(f"  [{i}] Downloaded: {img_path.name}")

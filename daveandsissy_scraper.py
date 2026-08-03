@@ -2,13 +2,21 @@
 """Scrape Amazon deals from daveandsissydailydeals.com and save to JSON."""
 
 import json
+import os
 import re
 import shutil
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
+from dotenv import load_dotenv
+
+load_dotenv()
+
+PROXY = os.environ.get("STATIC_PROXY", "")
+_PROXIES = {"http": PROXY, "https": PROXY} if PROXY else None
 
 URL = "https://daveandsissydailydeals.com/amazon-deals"
 DATA_DIR = Path(__file__).resolve().parent / "scraping data" / "daveandsissy_data"
@@ -22,6 +30,26 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     "Accept-Language": "en-US,en;q=0.9",
 }
+
+MAX_RETRIES = 3
+
+
+def _fetch_with_retry(url: str, use_proxy: bool = True, **kwargs) -> requests.Response:
+    """GET request with up to MAX_RETRIES attempts and progressive backoff."""
+    if use_proxy and _PROXIES and "proxies" not in kwargs:
+        kwargs["proxies"] = _PROXIES
+    last_exc = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            resp = requests.get(url, **kwargs)
+            resp.raise_for_status()
+            return resp
+        except Exception as e:
+            last_exc = e
+            if attempt < MAX_RETRIES:
+                print(f"    Retry {attempt}/{MAX_RETRIES} for {url[:70]}... ({e})")
+                time.sleep(1 * attempt)
+    raise last_exc
 
 
 def clean_amazon_url(href: str) -> str | None:
@@ -144,8 +172,7 @@ def download_images(products: list[dict], dest_dir: Path) -> None:
             counter += 1
 
         try:
-            resp = requests.get(img_url, headers=HEADERS, timeout=30)
-            resp.raise_for_status()
+            resp = _fetch_with_retry(img_url, use_proxy=False, headers=HEADERS, timeout=30)
             img_path.write_bytes(resp.content)
             product["image_path"] = str(img_path.resolve())
             print(f"  [{i}] Downloaded: {img_path.name}")
@@ -155,8 +182,7 @@ def download_images(products: list[dict], dest_dir: Path) -> None:
 
 def main() -> None:
     print(f"Fetching {URL} ...")
-    resp = requests.get(URL, headers=HEADERS, timeout=30)
-    resp.raise_for_status()
+    resp = _fetch_with_retry(URL, headers=HEADERS, timeout=30)  # uses proxy by default
 
     products = scrape_products(resp.text)
     print(f"Found {len(products)} products")
