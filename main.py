@@ -131,17 +131,16 @@ def render_carousel_card(item_index: int, product: dict) -> str:
         html += f'<span class="carousel-card-price">${deal_price:,.2f}</span>'
         if reg_price is not None and reg_price > deal_price:
             html += f'<span class="carousel-card-price-reg">${reg_price:,.2f}</span>'
+        if discount_pct is not None and discount_pct >= 75:
+            html += '<span class="carousel-card-hot-badge">🔥 Hot Deal</span>'
+        elif discount_pct is not None and discount_pct >= 60:
+            html += '<span class="carousel-card-trending-badge">📈 Trending</span>'
         html += '</div>'
     elif price:
         html += f'<div class="carousel-card-price">{price}</div>'
 
     if savings is not None and discount_pct is not None:
         html += f'<div class="carousel-card-save">Save ${savings:,.2f} ({discount_pct}%)</div>'
-
-    if discount_pct is not None and discount_pct >= 75:
-        html += '<div class="carousel-card-hot-badge">🔥 Hot Deal</div>'
-    elif discount_pct is not None and discount_pct >= 60:
-        html += '<div class="carousel-card-trending-badge">📈 Trending</div>'
 
     if amazon_url:
         html += '<div class="carousel-card-spacer"></div>'
@@ -226,18 +225,18 @@ CAROUSEL_STYLE_AND_SCRIPT = """
 .deals-carousel-page .carousel-card-hot-badge {
     display: inline-block;
     background: linear-gradient(135deg, #d32f2f, #b71c1c);
-    color: #fff; font-size: 11px; font-weight: 800;
-    padding: 4px 10px; border-radius: 20px; line-height: 1.3;
+    color: #fff; font-size: 10px; font-weight: 800;
+    padding: 3px 8px; border-radius: 20px; line-height: 1.3;
     text-align: center; box-shadow: 0 2px 6px rgba(211,47,47,0.5);
-    margin-bottom: 6px;
+    white-space: nowrap;
 }
 .deals-carousel-page .carousel-card-trending-badge {
     display: inline-block;
-    background: linear-gradient(135deg, #1565c0, #0d47a1);
-    color: #fff; font-size: 11px; font-weight: 800;
-    padding: 4px 10px; border-radius: 20px; line-height: 1.3;
-    text-align: center; box-shadow: 0 2px 6px rgba(21,101,192,0.5);
-    margin-bottom: 6px;
+    background: linear-gradient(135deg, #ff9800, #f57c00);
+    color: #fff; font-size: 10px; font-weight: 800;
+    padding: 3px 8px; border-radius: 20px; line-height: 1.3;
+    text-align: center; box-shadow: 0 2px 6px rgba(255,152,0,0.5);
+    white-space: nowrap;
 }
 .deals-carousel-page .carousel-card-title {
     font-size: 14px; font-weight: 800; color: #111; margin-bottom: 6px;
@@ -317,6 +316,26 @@ function copyCouponAndOpen(e, code) {
 """
 
 
+def _product_discount_pct(product: dict) -> int:
+    """Calculate discount percentage from product price string."""
+    deal_price, reg_price = _parse_prices(product.get("price", ""))
+    if deal_price is not None and reg_price is not None and reg_price > deal_price > 0:
+        return round((reg_price - deal_price) / reg_price * 100)
+    return 0
+
+
+def _sort_by_deal_rank(products: list) -> list:
+    """Sort products: hot deals (>=75%) first, then trending (>=60%), then others."""
+    def rank(p):
+        pct = _product_discount_pct(p)
+        if pct >= 75:
+            return 0
+        elif pct >= 60:
+            return 1
+        return 2
+    return sorted(products, key=rank)
+
+
 def build_page_html(products: list, page_title: str = "Best Amazon Deals") -> str:
     """Build the full WordPress page HTML: category nav + one carousel per category."""
     total = len(products)
@@ -325,6 +344,10 @@ def build_page_html(products: list, page_title: str = "Best Amazon Deals") -> st
     for p in products:
         cat = p.get("category", "Other")
         grouped.setdefault(cat, []).append(p)
+
+    # Sort products within each category: hot deals first, then trending, then others
+    for cat in grouped:
+        grouped[cat] = _sort_by_deal_rank(grouped[cat])
 
     ordered_categories = [c for c in CATEGORIES if c in grouped]
     remaining = sorted(c for c in grouped if c not in CATEGORIES)
