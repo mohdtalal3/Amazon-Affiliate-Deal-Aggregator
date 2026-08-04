@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Optional
 from datetime import datetime
 
-import requests
+from curl_cffi import requests
 
 # Load .env
 try:
@@ -87,6 +87,7 @@ def render_carousel_card(item_index: int, product: dict) -> str:
     discount = product.get("discount", "").strip()
     amazon_url = product.get("amazon_url", "")
     img_url = product.get("_img_url")
+    coupon_code = (product.get("coupon_code") or "").strip()
 
     title = name if name else f"Item #{item_index}"
     title = title[0].upper() + title[1:] if title else title
@@ -108,6 +109,9 @@ def render_carousel_card(item_index: int, product: dict) -> str:
         html += '</div>'
 
     html += f'<div class="carousel-card-title">{title}</div>'
+
+    if coupon_code:
+        html += f'<div class="carousel-card-coupon-tag" data-coupon="{coupon_code}">🎟️ Coupon: {coupon_code}</div>'
 
     if deal_price is not None:
         html += '<div class="carousel-card-price-row">'
@@ -131,10 +135,18 @@ def render_carousel_card(item_index: int, product: dict) -> str:
 
     if amazon_url:
         html += '<div class="carousel-card-spacer"></div>'
-        html += (
-            f'<a href="{amazon_url}" target="_blank" rel="noopener noreferrer" '
-            f'class="carousel-card-btn">See Deal on Amazon &amp; Claim Offer →</a>'
-        )
+        if coupon_code:
+            html += (
+                f'<a href="{amazon_url}" target="_blank" rel="noopener noreferrer" '
+                f'class="carousel-card-btn carousel-card-btn-coupon" '
+                f'onclick="return copyCouponAndOpen(event, \'{coupon_code}\')">'
+                f'Copy Code &amp; See Deal →</a>'
+            )
+        else:
+            html += (
+                f'<a href="{amazon_url}" target="_blank" rel="noopener noreferrer" '
+                f'class="carousel-card-btn">See Deal on Amazon →</a>'
+            )
 
     html += '</div>'
     return html
@@ -159,14 +171,14 @@ CAROUSEL_STYLE_AND_SCRIPT = """
     font-size: 21px; margin: 0 0 16px; padding-left: 12px;
     border-left: 4px solid #e63c3c;
 }
-.deals-carousel-page .carousel-wrapper { position: relative; }
+.deals-carousel-page .carousel-wrapper { position: relative; padding: 0 20px; }
 .deals-carousel-page .carousel-track {
     display: flex; gap: 16px; overflow-x: auto; scroll-behavior: smooth;
     padding: 4px 4px 16px; scrollbar-width: none;
 }
 .deals-carousel-page .carousel-track::-webkit-scrollbar { display: none; }
 .deals-carousel-page .carousel-arrow {
-    position: absolute; top: 42%; transform: translateY(-50%);
+    position: absolute; top: 80px; transform: translateY(-50%);
     width: 36px; height: 36px; border-radius: 50%; border: 1px solid #eee;
     background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
     color: #333; cursor: pointer; z-index: 10;
@@ -175,8 +187,8 @@ CAROUSEL_STYLE_AND_SCRIPT = """
 }
 .deals-carousel-page .carousel-arrow svg { width: 16px; height: 16px; display: block; }
 .deals-carousel-page .carousel-arrow:hover { background: #e63c3c; color: #fff; }
-.deals-carousel-page .carousel-arrow.left { left: -4px; }
-.deals-carousel-page .carousel-arrow.right { right: -4px; }
+.deals-carousel-page .carousel-arrow.left { left: 0; }
+.deals-carousel-page .carousel-arrow.right { right: 0; }
 .deals-carousel-page .carousel-card {
     flex: 0 0 240px; background: #fff; border: 1px solid #eee; border-radius: 10px;
     padding: 14px; box-shadow: 0 2px 6px rgba(0,0,0,0.05); display: flex;
@@ -211,8 +223,49 @@ CAROUSEL_STYLE_AND_SCRIPT = """
     box-shadow: 0 3px 8px rgba(244,67,54,0.35); transition: transform 0.15s;
 }
 .deals-carousel-page .carousel-card-btn:hover { transform: translateY(-1px); }
+.deals-carousel-page .carousel-card-coupon-tag {
+    display: inline-block; background: #fff3e0; border: 1px dashed #ff9800;
+    color: #e65100; font-size: 11px; font-weight: 700; padding: 3px 8px;
+    border-radius: 6px; margin-bottom: 6px;
+}
+.deals-carousel-page .carousel-card-btn-coupon {
+    background: linear-gradient(90deg, #f44336, #ff7043);
+    box-shadow: 0 3px 8px rgba(244,67,54,0.35);
+}
+.deals-carousel-page .carousel-card-btn-coupon:hover { transform: translateY(-1px); }
+.deals-carousel-page .coupon-toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: #2e7d32; color: #fff; font-size: 14px; font-weight: 700;
+    padding: 12px 24px; border-radius: 30px; z-index: 9999;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2); opacity: 0; transition: opacity 0.3s;
+    pointer-events: none;
+}
+.deals-carousel-page .coupon-toast.show { opacity: 1; }
 </style>
 <script>
+function copyCouponAndOpen(e, code) {
+    try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(code);
+        } else {
+            var ta = document.createElement('textarea');
+            ta.value = code;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (x) {}
+            document.body.removeChild(ta);
+        }
+        var toast = document.createElement('div');
+        toast.className = 'coupon-toast';
+        toast.textContent = 'Coupon code copied: ' + code;
+        document.body.appendChild(toast);
+        toast.classList.add('show');
+        setTimeout(function() { toast.classList.remove('show'); toast.remove(); }, 2000);
+    } catch (err) {}
+    return true;
+}
 (function() {
     document.querySelectorAll('.deals-carousel-page .carousel-arrow').forEach(function(btn) {
         btn.addEventListener('click', function() {
@@ -303,14 +356,23 @@ def upload_and_get_url(publisher: WordPressPublisher, img_path: Path, title: str
     """Upload image to WordPress and return its public source URL."""
     if not img_path or not img_path.exists():
         return None
-    media_id = publisher.upload_image(img_path, title=title)
-    if not media_id:
+    result = publisher.upload_image(img_path, title=title)
+    if not result:
         return None
+    # upload_image now returns (media_id, source_url) or None
+    if isinstance(result, tuple):
+        media_id, source_url = result
+    else:
+        media_id, source_url = result, None
+    if source_url:
+        return source_url
+    # Fallback: fetch URL from API (for old cache entries without source_url)
     try:
         resp = requests.get(
             f"{publisher.api_base}/media/{media_id}",
             auth=publisher.auth,
             timeout=15,
+            impersonate="chrome",
         )
         if resp.status_code == 200:
             return resp.json().get("source_url")

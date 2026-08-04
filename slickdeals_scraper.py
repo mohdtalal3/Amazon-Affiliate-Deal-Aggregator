@@ -264,13 +264,10 @@ def download_images(products: list[dict], dest_dir: Path) -> None:
 
 def main() -> None:
     deals = fetch_deals()
+    total_deals = len(deals)
+    amazon_deals = sum(1 for d in deals if d.get("storeName", "").lower() == "amazon" and not d.get("isExpired"))
 
     products = scrape_products(deals)
-    print(f"\nExtracted {len(products)} products with ASINs")
-
-    # Testing limit — remove or increase for production
-    products = products[:5]
-    print(f"Limited to {len(products)} products for testing")
 
     if DATA_DIR.exists():
         shutil.rmtree(DATA_DIR)
@@ -283,7 +280,18 @@ def main() -> None:
         json.dump(products, f, indent=2, ensure_ascii=False)
     print(f"Saved JSON to {OUTPUT_FILE}")
 
-    print(f"\nDone — all data in {DATA_DIR}")
+    with_images = sum(1 for p in products if p.get("image_path"))
+
+    print(f"\n{'='*50}")
+    print(f"  SUMMARY — slickdeals.net")
+    print(f"{'='*50}")
+    print(f"  Total deals fetched       : {total_deals}")
+    print(f"  Amazon deals (non-expired): {amazon_deals}")
+    print(f"  With ASIN extracted       : {len(products)}")
+    print(f"  With images downloaded    : {with_images}")
+    print(f"  Without images            : {len(products) - with_images}")
+    print(f"{'='*50}")
+    print(f"Done — all data in {DATA_DIR}")
 
 
 if __name__ == "__main__":

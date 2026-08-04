@@ -1,4 +1,4 @@
-import requests
+from curl_cffi import requests
 import csv
 import os
 import json
@@ -72,7 +72,7 @@ class WordPressPublisher:
     def test_connection(self) -> bool:
         """Test WordPress API connection."""
         try:
-            response = requests.get(f"{self.api_base}/users/me", auth=self.auth)
+            response = requests.get(f"{self.api_base}/users/me", auth=self.auth, impersonate="chrome")
             if response.status_code == 200:
                 user = response.json()
                 print(f"✅ Connected to WordPress as: {user.get('name', 'Unknown')}")
@@ -85,7 +85,7 @@ class WordPressPublisher:
             print(f"❌ Connection error: {e}")
             return False
     
-    def upload_image(self, image_path: Path, title: str = None) -> Optional[int]:
+    def upload_image(self, image_path: Path, title: str = None):
         """
         Upload an image to WordPress media library.
         
@@ -94,7 +94,8 @@ class WordPressPublisher:
             title: Optional title for the image
             
         Returns:
-            Media ID if successful, None otherwise
+            (media_id, source_url) tuple if successful, None otherwise.
+            Old cache entries may return (media_id, None).
         """
         if not image_path.exists():
             print(f"  ⚠️ Image not found: {image_path}")
@@ -103,13 +104,19 @@ class WordPressPublisher:
         # Dry run mode: simulate upload
         if self.dry_run:
             print(f"  🧪 [DRY RUN] Would upload: {image_path.name}")
-            return 99999  # Fake media ID for testing
+            return 99999, None  # Fake media ID for testing
         
         # Check if already uploaded
         cache_key = str(image_path)
         if cache_key in self.uploaded_media:
-            print(f"  ♻️ Using cached media ID for: {image_path.name}")
-            return self.uploaded_media[cache_key]
+            cached = self.uploaded_media[cache_key]
+            # Support both old (int) and new (dict) cache formats
+            if isinstance(cached, dict):
+                print(f"  ♻️ Using cached media for: {image_path.name}")
+                return cached.get("media_id"), cached.get("source_url")
+            else:
+                print(f"  ♻️ Using cached media ID for: {image_path.name}")
+                return cached, None
         
         try:
             # Read image file
@@ -128,7 +135,8 @@ class WordPressPublisher:
                 f"{self.api_base}/media",
                 headers=headers,
                 data=image_data,
-                auth=self.auth
+                auth=self.auth,
+                impersonate="chrome"
             )
             
             if response.status_code == 201:
@@ -140,13 +148,15 @@ class WordPressPublisher:
                     requests.post(
                         f"{self.api_base}/media/{media_id}",
                         json={'title': title},
-                        auth=self.auth
+                        auth=self.auth,
+                        impersonate="chrome"
                     )
                 
+                source_url = media.get('source_url', '')
                 print(f"  ✅ Uploaded: {image_path.name} (ID: {media_id})")
-                self.uploaded_media[cache_key] = media_id
+                self.uploaded_media[cache_key] = {"media_id": media_id, "source_url": source_url}
                 self.save_image_cache()  # Save after each upload
-                return media_id
+                return media_id, source_url
             else:
                 print(f"  ❌ Failed to upload {image_path.name}: {response.status_code}")
                 print(f"     {response.text}")
@@ -215,7 +225,8 @@ class WordPressPublisher:
             response = requests.post(
                 f"{self.api_base}/{first_type}/{page_id}",
                 json=page_data,
-                auth=self.auth
+                auth=self.auth,
+                impersonate="chrome"
             )
             
             # If first attempt fails with 404, try the other type
@@ -224,7 +235,8 @@ class WordPressPublisher:
                 response = requests.post(
                     f"{self.api_base}/{second_type}/{page_id}",
                     json=page_data,
-                    auth=self.auth
+                    auth=self.auth,
+                    impersonate="chrome"
                 )
             
             response_old = response  # Keep for error reporting
@@ -295,7 +307,8 @@ class WordPressPublisher:
             response = requests.post(
                 f"{self.api_base}/posts",
                 json=post_data,
-                auth=self.auth
+                auth=self.auth,
+                impersonate="chrome"
             )
             
             if response.status_code == 201:
@@ -322,7 +335,8 @@ class WordPressPublisher:
             response = requests.get(
                 f"{self.api_base}/categories",
                 params={'search': name},
-                auth=self.auth
+                auth=self.auth,
+                impersonate="chrome"
             )
             
             if response.status_code == 200:
@@ -335,7 +349,8 @@ class WordPressPublisher:
             response = requests.post(
                 f"{self.api_base}/categories",
                 json={'name': name},
-                auth=self.auth
+                auth=self.auth,
+                impersonate="chrome"
             )
             
             if response.status_code == 201:
@@ -636,10 +651,11 @@ class WordPressPublisher:
         
         if page_images:
             print(f"\n📸 Uploading flyer pages...")
-            featured_image_id = self.upload_image(
+            result = self.upload_image(
                 page_images[0],
                 title=f"Aldi {flyer_type} {date_range} - Page 1"
             )
+            featured_image_id = result[0] if isinstance(result, tuple) else result
         
         # Build content
         content = f"""
@@ -658,15 +674,17 @@ class WordPressPublisher:
             content += '        <div class="flyer-images">\n'
             
             for idx, page_img in enumerate(page_images, 1):
-                img_id = self.upload_image(
+                result = self.upload_image(
                     page_img,
                     title=f"Aldi {flyer_type} {date_range} - Page {idx}"
                 )
-                if img_id:
-                    # Get image URL
-                    resp = requests.get(f"{self.api_base}/media/{img_id}", auth=self.auth)
-                    if resp.status_code == 200:
-                        img_url = resp.json()['source_url']
+                if result:
+                    img_id, img_url = result if isinstance(result, tuple) else (result, None)
+                    if not img_url:
+                        resp = requests.get(f"{self.api_base}/media/{img_id}", auth=self.auth, impersonate="chrome")
+                        if resp.status_code == 200:
+                            img_url = resp.json()['source_url']
+                    if img_url:
                         content += f'            <img src="{img_url}" alt="Aldi {flyer_type} Page {idx}" class="flyer-page" />\n'
             
             content += '        </div>\n'
@@ -687,15 +705,22 @@ class WordPressPublisher:
             product_img_id = None
             if image_names and image_names[0]:
                 img_path = ad_folder / image_names[0]
-                product_img_id = self.upload_image(img_path, title=product_name)
+                result = self.upload_image(img_path, title=product_name)
+                product_img_id, product_img_url = result if isinstance(result, tuple) and result else (result, None)
             
             # Add product to content
             content += '            <div class="product-item">\n'
             
             if product_img_id:
-                resp = requests.get(f"{self.api_base}/media/{product_img_id}", auth=self.auth)
-                if resp.status_code == 200:
-                    img_url = resp.json()['source_url']
+                if not product_img_url:
+                    resp = requests.get(f"{self.api_base}/media/{product_img_id}", auth=self.auth, impersonate="chrome")
+                    if resp.status_code == 200:
+                        img_url = resp.json()['source_url']
+                    else:
+                        img_url = None
+                else:
+                    img_url = product_img_url
+                if img_url:
                     content += f'                <div class="product-image">\n'
                     content += f'                    <img src="{img_url}" alt="{product_name}" />\n'
                     content += f'                </div>\n'

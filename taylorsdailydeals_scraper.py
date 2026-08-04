@@ -71,6 +71,15 @@ def format_price(item: dict) -> str:
     return price
 
 
+def discount_pct(item: dict) -> float | None:
+    """Calculate discount percentage from deal and regular price. Returns None if not computable."""
+    deal_price = item.get("deal_price_min")
+    reg_price = item.get("regular_price_min")
+    if deal_price is None or reg_price is None or reg_price <= 0:
+        return None
+    return (1 - deal_price / reg_price) * 100
+
+
 def fetch_all_deals() -> list[dict]:
     """Paginate through all deals via offset, return raw items."""
     all_items = []
@@ -95,13 +104,11 @@ def fetch_all_deals() -> list[dict]:
     return all_items
 
 
-def scrape_products(items: list[dict]) -> list[dict]:
+def scrape_products(items: list[dict]) -> tuple[int, list[dict]]:
+    """Filter and format deal items, return (total_items, filtered_products)."""
     products = []
+    total_items = len(items)
     for item in items:
-        # Skip coupon products
-        if item.get("coupon_code"):
-            continue
-
         asin = item.get("asin")
         amazon_url = item.get("canonical_product_url") or item.get("product_url")
         if not amazon_url and asin:
@@ -109,10 +116,15 @@ def scrape_products(items: list[dict]) -> list[dict]:
         if not amazon_url:
             continue
 
+        pct = discount_pct(item)
+        if pct is None or pct < 50:
+            continue
+
         name = clean_product_name(item.get("clean_title") or item.get("title") or "")
         image_url = (item.get("image_url") or "").strip()
         discount = (item.get("discount_text") or "").strip()
         price = format_price(item)
+        coupon_code = (item.get("coupon_code") or "").strip()
 
         products.append(
             {
@@ -122,9 +134,10 @@ def scrape_products(items: list[dict]) -> list[dict]:
                 "image_url": image_url,
                 "discount": discount,
                 "price": price,
+                "coupon_code": coupon_code,
             }
         )
-    return products
+    return total_items, products
 
 
 def sanitize_filename(name: str) -> str:
@@ -168,12 +181,9 @@ def main() -> None:
     items = fetch_all_deals()
     print(f"Found {len(items)} total deals")
 
-    products = scrape_products(items)
-    print(f"After filtering coupons: {len(products)} products")
-
-    # Testing limit — remove or increase for production
-    ##products = products[:10]
-    print(f"Limited to {len(products)} products for testing")
+    total_found, products = scrape_products(items)
+    filtered_low_discount = total_found - len(products)
+    with_coupon = sum(1 for p in products if p.get("coupon_code"))
 
     if DATA_DIR.exists():
         shutil.rmtree(DATA_DIR)
@@ -186,7 +196,20 @@ def main() -> None:
         json.dump(products, f, indent=2, ensure_ascii=False)
     print(f"Saved JSON to {OUTPUT_FILE}")
 
-    print(f"\nDone — all data in {DATA_DIR}")
+    with_images = sum(1 for p in products if p.get("image_path"))
+
+    print(f"\n{'='*50}")
+    print(f"  SUMMARY — taylorsdailydeals.com")
+    print(f"{'='*50}")
+    print(f"  Total products found      : {total_found}")
+    print(f"  Filtered (<50% discount)  : {filtered_low_discount}")
+    print(f"  After discount filter     : {len(products)}")
+    print(f"  Products with coupon code : {with_coupon}")
+    print(f"  Products without coupon   : {len(products) - with_coupon}")
+    print(f"  With images downloaded    : {with_images}")
+    print(f"  Without images            : {len(products) - with_images}")
+    print(f"{'='*50}")
+    print(f"Done — all data in {DATA_DIR}")
 
 
 if __name__ == "__main__":

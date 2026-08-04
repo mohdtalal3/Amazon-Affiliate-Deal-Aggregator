@@ -99,14 +99,17 @@ def parse_details(details_el) -> tuple[str, str]:
     return discount, price
 
 
-def scrape_products(html: str) -> list[dict]:
+def scrape_products(html: str) -> tuple[int, list[dict]]:
+    """Parse HTML, return (total_cards_found, filtered_products)."""
     soup = BeautifulSoup(html, "html.parser")
     products = []
+    total_cards = 0
 
     # Each product lives in a funnel card
     cards = soup.select("div.funnel")
 
     for card in cards:
+        total_cards += 1
         # Amazon URL from image link or SEE DEAL button
         link = card.select_one("a.image-link[href], a.btn-aqua[href]")
         href = link["href"] if link and link.has_attr("href") else ""
@@ -124,9 +127,12 @@ def scrape_products(html: str) -> list[dict]:
         details = card.select_one("div.details")
         discount, price = parse_details(details)
 
-        # Skip coupon products — detected by "Code" in the discount/details text
-        if discount and re.search(r"\bCode\b", discount, re.I):
-            continue
+        # Extract coupon code if present (e.g. "50% Off Code 48OUJGYG")
+        coupon_code = ""
+        if discount:
+            code_match = re.search(r"\bCode\s+([A-Z0-9]+)", discount, re.I)
+            if code_match:
+                coupon_code = code_match.group(1)
 
         products.append(
             {
@@ -136,10 +142,11 @@ def scrape_products(html: str) -> list[dict]:
                 "image_url": image_url,
                 "discount": discount,
                 "price": price,
+                "coupon_code": coupon_code,
             }
         )
 
-    return products
+    return total_cards, products
 
 
 def sanitize_filename(name: str) -> str:
@@ -184,18 +191,14 @@ def main() -> None:
     print(f"Fetching {URL} ...")
     resp = _fetch_with_retry(URL, headers=HEADERS, timeout=30)  # uses proxy by default
 
-    products = scrape_products(resp.text)
-    print(f"Found {len(products)} products")
-
-    # Testing limit — remove or increase for production
-    products = products[:2]
-    print(f"Limited to {len(products)} products for testing")
+    total_found, products = scrape_products(resp.text)
+    with_coupon = sum(1 for p in products if p.get("coupon_code"))
 
     # Recreate data directory (replace existing)
     if DATA_DIR.exists():
         shutil.rmtree(DATA_DIR)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-
+    products = products[:5]
     # Download images (sets image_path on each product)
     print(f"\nDownloading images to {DATA_DIR} ...")
     download_images(products, DATA_DIR)
@@ -205,7 +208,18 @@ def main() -> None:
         json.dump(products, f, indent=2, ensure_ascii=False)
     print(f"Saved JSON to {OUTPUT_FILE}")
 
-    print(f"\nDone — all data in {DATA_DIR}")
+    with_images = sum(1 for p in products if p.get("image_path"))
+
+    print(f"\n{'='*50}")
+    print(f"  SUMMARY — daveandsissydailydeals")
+    print(f"{'='*50}")
+    print(f"  Total products found      : {total_found}")
+    print(f"  Products with coupon code : {with_coupon}")
+    print(f"  Products without coupon   : {len(products) - with_coupon}")
+    print(f"  With images downloaded    : {with_images}")
+    print(f"  Without images            : {len(products) - with_images}")
+    print(f"{'='*50}")
+    print(f"Done — all data in {DATA_DIR}")
 
 
 if __name__ == "__main__":

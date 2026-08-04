@@ -95,9 +95,11 @@ def format_discount(deal: dict) -> str:
     return "\n".join(lines)
 
 
-def scrape_products(payload: dict) -> list[dict]:
+def scrape_products(payload: dict) -> tuple[int, list[dict]]:
+    """Parse API payload, return (total_deals_found, filtered_products)."""
     deals = payload.get("deals", [])
     products = []
+    total_deals = len(deals)
 
     for deal in deals:
         if deal.get("promoCode"):
@@ -127,7 +129,7 @@ def scrape_products(payload: dict) -> list[dict]:
             }
         )
 
-    return products
+    return total_deals, products
 
 
 def sanitize_filename(name: str) -> str:
@@ -171,12 +173,8 @@ def main() -> None:
     resp = _fetch_with_retry(API_URL, headers=HEADERS, timeout=30)
     payload = resp.json()
 
-    products = scrape_products(payload)
-    print(f"Found {len(products)} products")
-
-    # Testing limit — remove or increase for production
-    products = products[:2]
-    print(f"Limited to {len(products)} products for testing")
+    total_found, products = scrape_products(payload)
+    coupon_filtered = total_found - len(products)
 
     if DATA_DIR.exists():
         shutil.rmtree(DATA_DIR)
@@ -189,7 +187,18 @@ def main() -> None:
         json.dump(products, f, indent=2, ensure_ascii=False)
     print(f"Saved JSON to {OUTPUT_FILE}")
 
-    print(f"\nDone — all data in {DATA_DIR}")
+    with_images = sum(1 for p in products if p.get("image_path"))
+
+    print(f"\n{'='*50}")
+    print(f"  SUMMARY — jungle.deals")
+    print(f"{'='*50}")
+    print(f"  Total products found      : {total_found}")
+    print(f"  Coupon products filtered  : {coupon_filtered}")
+    print(f"  After coupon filtering    : {len(products)}")
+    print(f"  With images downloaded    : {with_images}")
+    print(f"  Without images            : {len(products) - with_images}")
+    print(f"{'='*50}")
+    print(f"Done — all data in {DATA_DIR}")
 
 
 if __name__ == "__main__":
