@@ -138,6 +138,11 @@ def render_carousel_card(item_index: int, product: dict) -> str:
     if savings is not None and discount_pct is not None:
         html += f'<div class="carousel-card-save">Save ${savings:,.2f} ({discount_pct}%)</div>'
 
+    if discount_pct is not None and discount_pct >= 75:
+        html += '<div class="carousel-card-hot-badge">🔥 Hot Deal</div>'
+    elif discount_pct is not None and discount_pct >= 60:
+        html += '<div class="carousel-card-trending-badge">📈 Trending</div>'
+
     if amazon_url:
         html += '<div class="carousel-card-spacer"></div>'
         if coupon_code:
@@ -217,6 +222,22 @@ CAROUSEL_STYLE_AND_SCRIPT = """
     color: #fff; font-size: 11px; font-weight: 800;
     padding: 4px 10px; border-radius: 20px; line-height: 1.3;
     text-align: center; box-shadow: 0 2px 6px rgba(255,152,0,0.4);
+}
+.deals-carousel-page .carousel-card-hot-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #d32f2f, #b71c1c);
+    color: #fff; font-size: 11px; font-weight: 800;
+    padding: 4px 10px; border-radius: 20px; line-height: 1.3;
+    text-align: center; box-shadow: 0 2px 6px rgba(211,47,47,0.5);
+    margin-bottom: 6px;
+}
+.deals-carousel-page .carousel-card-trending-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #1565c0, #0d47a1);
+    color: #fff; font-size: 11px; font-weight: 800;
+    padding: 4px 10px; border-radius: 20px; line-height: 1.3;
+    text-align: center; box-shadow: 0 2px 6px rgba(21,101,192,0.5);
+    margin-bottom: 6px;
 }
 .deals-carousel-page .carousel-card-title {
     font-size: 14px; font-weight: 800; color: #111; margin-bottom: 6px;
