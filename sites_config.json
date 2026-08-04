@@ -1,15 +1,21 @@
 {
-  "aggregate_page_id": 365850,
+  "aggregate_page_id": 372893,
   "wp_env_prefix": "RS",
   "page_title": "Best Amazon Deals Today",
   "enabled": true,
   "schedule": {
     "days_of_week": [
-      "sat"
+      "mon",
+      "tue",
+      "wed",
+      "thu",
+      "fri",
+      "sat",
+      "sun"
     ],
-    "hour": 5,
+    "hour": 4,
     "minute": 0,
-    "timezone": "America/Chicago"
+    "timezone": "America/Los_Angeles"
   },
   "last_run": "2026-08-05T01:53:41.558947",
   "last_run_status": "success",

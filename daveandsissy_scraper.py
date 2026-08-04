@@ -198,7 +198,7 @@ def main() -> None:
     if DATA_DIR.exists():
         shutil.rmtree(DATA_DIR)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    products = products[:5]
+    #products = products[:5]
     # Download images (sets image_path on each product)
     print(f"\nDownloading images to {DATA_DIR} ...")
     download_images(products, DATA_DIR)
