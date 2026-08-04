@@ -53,7 +53,7 @@ def _fetch_with_retry(url: str, use_proxy: bool = True, **kwargs) -> requests.Re
 
 
 def clean_amazon_url(href: str) -> str | None:
-    """Keep only https://www.amazon.com/dp/ASIN."""
+    """Keep only https://www.amazon.com/dp/ASIN or /promocode/CODE URLs."""
     if not href:
         return None
     match = re.search(r"(https?://(?:www\.)?amazon\.com/dp/[A-Z0-9]{10})", href, re.I)
@@ -64,6 +64,10 @@ def clean_amazon_url(href: str) -> str | None:
     dp_match = re.search(r"/dp/([A-Z0-9]{10})", parsed.path, re.I)
     if dp_match:
         return f"https://www.amazon.com/dp/{dp_match.group(1).upper()}"
+    # Promocode links: keep full URL (contains the promo code in path)
+    promo_match = re.search(r"(https?://(?:www\.)?amazon\.com/promocode/[A-Z0-9]+)", href, re.I)
+    if promo_match:
+        return promo_match.group(1)
     return None
 
 
