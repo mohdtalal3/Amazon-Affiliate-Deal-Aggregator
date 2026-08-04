@@ -325,7 +325,10 @@ def _product_discount_pct(product: dict) -> int:
 
 
 def _sort_by_deal_rank(products: list) -> list:
-    """Sort products: hot deals (>=75%) first, then trending (>=60%), then others."""
+    """Sort products: hot deals (>=75%) first, then trending (>=60%), then others.
+    Within each tier, products are shuffled randomly so the page feels fresh daily."""
+    import random
+
     def rank(p):
         pct = _product_discount_pct(p)
         if pct >= 75:
@@ -333,7 +336,16 @@ def _sort_by_deal_rank(products: list) -> list:
         elif pct >= 60:
             return 1
         return 2
-    return sorted(products, key=rank)
+
+    # Group by tier, shuffle within each tier, then concatenate in tier order
+    tiers = {0: [], 1: [], 2: []}
+    for p in products:
+        tiers[rank(p)].append(p)
+    result = []
+    for tier in (0, 1, 2):
+        random.shuffle(tiers[tier])
+        result.extend(tiers[tier])
+    return result
 
 
 def build_page_html(products: list, page_title: str = "Best Amazon Deals") -> str:
