@@ -172,9 +172,9 @@ CAROUSEL_STYLE_AND_SCRIPT = """
     background: #e63c3c; color: #fff; border-color: #e63c3c;
 }
 .deals-carousel-page .deal-category-section { margin-bottom: 40px; scroll-margin-top: 80px; }
-.deals-carousel-page .deal-category-section h2 {
-    font-size: 21px; margin: 0 0 16px; padding-left: 12px;
-    border-left: 4px solid #e63c3c;
+.deals-carousel-page .deal-category-section .carousel-section-title {
+    font-size: 21px; font-weight: 800; margin: 0 0 16px; padding-left: 12px;
+    border-left: 4px solid #e63c3c; color: #111;
 }
 .deals-carousel-page .carousel-wrapper { position: relative; padding: 0 20px; }
 .deals-carousel-page .carousel-track {
@@ -220,6 +220,8 @@ CAROUSEL_STYLE_AND_SCRIPT = """
 }
 .deals-carousel-page .carousel-card-title {
     font-size: 14px; font-weight: 800; color: #111; margin-bottom: 6px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; text-overflow: ellipsis;
 }
 .deals-carousel-page .carousel-card-price-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 2px; }
 .deals-carousel-page .carousel-card-price { font-size: 17px; font-weight: 800; color: #2e7d32; margin-bottom: 4px; }
@@ -328,7 +330,7 @@ def build_page_html(products: list, page_title: str = "Best Amazon Deals") -> st
         items = grouped[cat]
 
         html += f'  <div class="deal-category-section" id="cat-{slug}">\n'
-        html += f'    <h2>{cat}</h2>\n'
+        html += f'    <div class="carousel-section-title">{cat}</div>\n'
         html += '    <div class="carousel-wrapper">\n'
         html += (
             f'      <button type="button" class="carousel-arrow left" data-track="track-{slug}" aria-label="Scroll left">'

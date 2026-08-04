@@ -117,7 +117,7 @@ def scrape_products(items: list[dict]) -> tuple[int, list[dict]]:
             continue
 
         pct = discount_pct(item)
-        if pct is None or pct < 50:
+        if pct is None or pct < 75:
             continue
 
         name = clean_product_name(item.get("clean_title") or item.get("title") or "")
@@ -202,7 +202,7 @@ def main() -> None:
     print(f"  SUMMARY — taylorsdailydeals.com")
     print(f"{'='*50}")
     print(f"  Total products found      : {total_found}")
-    print(f"  Filtered (<50% discount)  : {filtered_low_discount}")
+    print(f"  Filtered (<75% discount)  : {filtered_low_discount}")
     print(f"  After discount filter     : {len(products)}")
     print(f"  Products with coupon code : {with_coupon}")
     print(f"  Products without coupon   : {len(products) - with_coupon}")
