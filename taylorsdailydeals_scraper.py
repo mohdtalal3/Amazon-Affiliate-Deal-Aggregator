@@ -190,7 +190,7 @@ def main() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     print(f"\nDownloading images to {DATA_DIR} ...")
-    #download_images(products, DATA_DIR)
+    download_images(products, DATA_DIR)
 
     with OUTPUT_FILE.open("w", encoding="utf-8") as f:
         json.dump(products, f, indent=2, ensure_ascii=False)

@@ -32,10 +32,12 @@ except Exception:
 
 from wordpress_publisher import WordPressPublisher
 from categorize import categorize_products, CATEGORIES
+from slack_notifier import notify_scraper_start, notify_scraper_complete, notify_scraper_error
 
 DEFAULT_PAGE_ID = 304402
 SITES_FILE = Path(__file__).resolve().parent / "sites_config.json"
 AGGREGATE_JSON = Path(__file__).resolve().parent / "scraping data" / "aggregated_products.json"
+AMAZON_AFFILIATE_TAG = os.environ.get("AMAZON_AFFILIATE_TAG", "")
 
 
 # ── CONFIG HELPERS ────────────────────────────────────────────────────────────
@@ -60,6 +62,18 @@ def get_site_config(site_id: str) -> Optional[dict]:
 def load_scraper(scraper_module_name: str):
     """Dynamically import a scraper module by name."""
     return importlib.import_module(scraper_module_name)
+
+
+def _append_affiliate_tag(url: str) -> str:
+    """Append the Amazon affiliate tag to an Amazon product URL."""
+    if not url or not AMAZON_AFFILIATE_TAG:
+        return url
+    if "amazon.com" not in url:
+        return url
+    if f"tag={AMAZON_AFFILIATE_TAG}" in url:
+        return url
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}tag={AMAZON_AFFILIATE_TAG}"
 
 
 # ── HTML BUILDERS ─────────────────────────────────────────────────────────────
@@ -106,12 +120,11 @@ def render_carousel_card(item_index: int, product: dict) -> str:
         html += f'<div class="carousel-card-img"><img src="{img_url}" alt="{title_safe}" loading="lazy" />'
         if discount_pct:
             html += f'<span class="carousel-card-badge">-{discount_pct}% OFF</span>'
+        if coupon_code:
+            html += '<span class="carousel-card-coupon-badge">Coupon</span>'
         html += '</div>'
 
     html += f'<div class="carousel-card-title">{title}</div>'
-
-    if coupon_code:
-        html += f'<div class="carousel-card-coupon-tag" data-coupon="{coupon_code}">🎟️ Coupon: {coupon_code}</div>'
 
     if deal_price is not None:
         html += '<div class="carousel-card-price-row">'
@@ -124,14 +137,6 @@ def render_carousel_card(item_index: int, product: dict) -> str:
 
     if savings is not None and discount_pct is not None:
         html += f'<div class="carousel-card-save">Save ${savings:,.2f} ({discount_pct}%)</div>'
-
-    if discount:
-        discount_lines = [line.strip() for line in discount.split("\n") if line.strip()]
-        # Drop lines that just repeat the product name (redundant with the title above)
-        if title:
-            discount_lines = [line for line in discount_lines if title.lower() not in line.lower()]
-        for line in discount_lines:
-            html += f'<div class="carousel-card-discount">{line}</div>'
 
     if amazon_url:
         html += '<div class="carousel-card-spacer"></div>'
@@ -206,6 +211,13 @@ CAROUSEL_STYLE_AND_SCRIPT = """
     padding: 4px 10px; border-radius: 20px; line-height: 1.3;
     text-align: center; box-shadow: 0 2px 6px rgba(230,60,60,0.4);
 }
+.deals-carousel-page .carousel-card-coupon-badge {
+    position: absolute; top: 0; left: 0;
+    background: linear-gradient(135deg, #ff9800, #f57c00);
+    color: #fff; font-size: 11px; font-weight: 800;
+    padding: 4px 10px; border-radius: 20px; line-height: 1.3;
+    text-align: center; box-shadow: 0 2px 6px rgba(255,152,0,0.4);
+}
 .deals-carousel-page .carousel-card-title {
     font-size: 14px; font-weight: 800; color: #111; margin-bottom: 6px;
 }
@@ -223,11 +235,6 @@ CAROUSEL_STYLE_AND_SCRIPT = """
     box-shadow: 0 3px 8px rgba(244,67,54,0.35); transition: transform 0.15s;
 }
 .deals-carousel-page .carousel-card-btn:hover { transform: translateY(-1px); }
-.deals-carousel-page .carousel-card-coupon-tag {
-    display: inline-block; background: #fff3e0; border: 1px dashed #ff9800;
-    color: #e65100; font-size: 11px; font-weight: 700; padding: 3px 8px;
-    border-radius: 6px; margin-bottom: 6px;
-}
 .deals-carousel-page .carousel-card-btn-coupon {
     background: linear-gradient(90deg, #f44336, #ff7043);
     box-shadow: 0 3px 8px rgba(244,67,54,0.35);
@@ -390,6 +397,7 @@ def scrape_single_site(site: dict) -> list[dict]:
     scraper_module_name = site.get("scraper", f"{site_id}_scraper")
 
     print(f"\n  → Scraping: {site_name}")
+    notify_scraper_start(site_name)
 
     try:
         scraper = load_scraper(scraper_module_name)
@@ -398,6 +406,7 @@ def scrape_single_site(site: dict) -> list[dict]:
         json_file = scraper.OUTPUT_FILE
         if not json_file.exists():
             print(f"    ❌ No output at {json_file}")
+            notify_scraper_error(site_name, "No output file generated")
             return []
 
         with open(json_file, "r", encoding="utf-8") as f:
@@ -409,10 +418,21 @@ def scrape_single_site(site: dict) -> list[dict]:
             p["_source_name"] = site_name
 
         print(f"    ✅ Got {len(products)} products")
+
+        # Slack notification with scraper details
+        with_coupon = sum(1 for p in products if (p.get("coupon_code") or "").strip())
+        notify_scraper_complete(
+            site_name=site_name,
+            total_found=len(products),
+            product_count=len(products),
+            with_coupon=with_coupon,
+        )
+
         return products
 
     except Exception as e:
         print(f"    ❌ Scraper error: {e}")
+        notify_scraper_error(site_name, str(e))
         return []
 
 
@@ -448,6 +468,11 @@ def scrape_all_sites(config: dict, only_site_id: Optional[str] = None) -> list[d
         all_products.extend(products)
 
     save_config(config)
+
+    # Apply Amazon affiliate tag to all product URLs
+    if AMAZON_AFFILIATE_TAG:
+        for p in all_products:
+            p["amazon_url"] = _append_affiliate_tag(p.get("amazon_url", ""))
 
     # Save aggregated JSON
     AGGREGATE_JSON.parent.mkdir(parents=True, exist_ok=True)
@@ -487,6 +512,9 @@ def run_pipeline(
             return False
         with open(AGGREGATE_JSON, "r", encoding="utf-8") as f:
             all_products = json.load(f)
+        if AMAZON_AFFILIATE_TAG:
+            for p in all_products:
+                p["amazon_url"] = _append_affiliate_tag(p.get("amazon_url", ""))
 
     if not all_products:
         print("❌ No products found from any scraper")

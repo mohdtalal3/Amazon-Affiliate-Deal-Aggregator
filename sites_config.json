@@ -11,7 +11,7 @@
     "minute": 0,
     "timezone": "America/Chicago"
   },
-  "last_run": "2026-08-05T01:11:10.091240",
+  "last_run": "2026-08-05T01:53:41.558947",
   "last_run_status": "success",
   "sites": [
     {
@@ -20,7 +20,7 @@
       "scraper": "daveandsissy_scraper",
       "source_url": "https://daveandsissydailydeals.com/amazon-deals",
       "enabled": true,
-      "last_run": "2026-08-05T01:11:02.808077",
+      "last_run": "2026-08-05T01:53:34.186982",
       "last_run_status": "success"
     },
     {
