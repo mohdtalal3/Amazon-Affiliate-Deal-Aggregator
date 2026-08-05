@@ -1,4 +1,4 @@
-from curl_cffi import requests
+import requests
 import csv
 import os
 import json
@@ -72,7 +72,7 @@ class WordPressPublisher:
     def test_connection(self) -> bool:
         """Test WordPress API connection."""
         try:
-            response = requests.get(f"{self.api_base}/users/me", auth=self.auth, impersonate="chrome")
+            response = requests.get(f"{self.api_base}/users/me", auth=self.auth, timeout=30)
             if response.status_code == 200:
                 user = response.json()
                 print(f"✅ Connected to WordPress as: {user.get('name', 'Unknown')}")
@@ -136,7 +136,7 @@ class WordPressPublisher:
                 headers=headers,
                 data=image_data,
                 auth=self.auth,
-                impersonate="chrome"
+                timeout=60
             )
             
             if response.status_code == 201:
@@ -149,7 +149,7 @@ class WordPressPublisher:
                         f"{self.api_base}/media/{media_id}",
                         json={'title': title},
                         auth=self.auth,
-                        impersonate="chrome"
+                        timeout=30
                     )
                 
                 source_url = media.get('source_url', '')
@@ -226,7 +226,7 @@ class WordPressPublisher:
                 f"{self.api_base}/{first_type}/{page_id}",
                 json=page_data,
                 auth=self.auth,
-                impersonate="chrome"
+                timeout=30
             )
             
             # If first attempt fails with 404, try the other type
@@ -236,7 +236,7 @@ class WordPressPublisher:
                     f"{self.api_base}/{second_type}/{page_id}",
                     json=page_data,
                     auth=self.auth,
-                    impersonate="chrome"
+                    timeout=30
                 )
             
             response_old = response  # Keep for error reporting
@@ -308,7 +308,7 @@ class WordPressPublisher:
                 f"{self.api_base}/posts",
                 json=post_data,
                 auth=self.auth,
-                impersonate="chrome"
+                timeout=30
             )
             
             if response.status_code == 201:
@@ -336,7 +336,7 @@ class WordPressPublisher:
                 f"{self.api_base}/categories",
                 params={'search': name},
                 auth=self.auth,
-                impersonate="chrome"
+                timeout=30
             )
             
             if response.status_code == 200:
@@ -350,7 +350,7 @@ class WordPressPublisher:
                 f"{self.api_base}/categories",
                 json={'name': name},
                 auth=self.auth,
-                impersonate="chrome"
+                timeout=30
             )
             
             if response.status_code == 201:
@@ -681,7 +681,7 @@ class WordPressPublisher:
                 if result:
                     img_id, img_url = result if isinstance(result, tuple) else (result, None)
                     if not img_url:
-                        resp = requests.get(f"{self.api_base}/media/{img_id}", auth=self.auth, impersonate="chrome")
+                        resp = requests.get(f"{self.api_base}/media/{img_id}", auth=self.auth, timeout=30)
                         if resp.status_code == 200:
                             img_url = resp.json()['source_url']
                     if img_url:
@@ -713,7 +713,7 @@ class WordPressPublisher:
             
             if product_img_id:
                 if not product_img_url:
-                    resp = requests.get(f"{self.api_base}/media/{product_img_id}", auth=self.auth, impersonate="chrome")
+                    resp = requests.get(f"{self.api_base}/media/{product_img_id}", auth=self.auth, timeout=30)
                     if resp.status_code == 200:
                         img_url = resp.json()['source_url']
                     else:

@@ -410,8 +410,8 @@ def build_page_html(products: list, page_title: str = "Best Amazon Deals") -> st
         html += '    </div>\n'
         html += '  </div>\n\n'
 
+    html += '</div>\n\n'
     html += CAROUSEL_STYLE_AND_SCRIPT
-    html += '</div>'
     return html
 
 
