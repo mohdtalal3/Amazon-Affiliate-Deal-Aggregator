@@ -109,19 +109,20 @@ def discover_api_endpoint() -> tuple[str, dict]:
 
     html = resp.text
 
+    # Slickdeals now JSON-escapes slashes as \u002F in the embedded config,
+    # so match both escaped and literal slashes.
     pattern = re.compile(
         r'"topretaildeals-amazon"\s*,\s*'
         r'"[a-f0-9]+"\s*,\s*'
-        r'"/web-api/dxp/content-block/'
-        r'([a-f0-9]+/[a-f0-9]+)',
+        r'"(?:\\u002F|/)web-api(?:\\u002F|/)dxp(?:\\u002F|/)content-block(?:\\u002F|/)'
+        r'([a-f0-9]+)(?:\\u002F|/)([a-f0-9]+)',
         re.IGNORECASE,
     )
     match = pattern.search(html)
     if not match:
         raise RuntimeError("Could not find Amazon content block IDs in page HTML")
 
-    feed_block = match.group(1)
-    feed_id, block_id = feed_block.split("/")
+    feed_id, block_id = match.group(1), match.group(2)
     print(f"  → Feed ID: {feed_id}, Block ID: {block_id}")
 
     api_url = f"{API_BASE}{feed_id}/{block_id}/"
